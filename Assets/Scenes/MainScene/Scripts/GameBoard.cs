@@ -165,17 +165,124 @@ public class GameBoard : MonoBehaviour,UserInputEventHandler{
 
 	}
 
-	public void onInputHold(){
-			
-		if(selectedTile == null)return;
-		Debug.DrawLine(selectedTile.transform.position,userInput.getPointerPosInWorldSpace(),Color.black);
-
-	}
-	
 	//input state variables	
 	private TileActor selectedTile;
 
 
+
+	public void onInputHold(){
+			
+		if(selectedTile == null)return;
+		Debug.DrawLine(selectedTile.transform.position,userInput.getPointerPosInWorldSpace(),Color.black);
+		
+		
+		TileActor selected = selectedTile;
+		if (selected!=null){
+			
+			Vector2 diff = getpointerPosInBoardSpace() - (Vector2) selected.transform.localPosition;
+			if(diff.sqrMagnitude > currentData.swipeDelta){
+				selected.restoreHighlight();
+
+				selectedTile = null;
+				float angle = Mathf.Repeat(Vector2.SignedAngle(myTransform.right,diff)+360.0f,360.0f);
+				Dir userDir = Match3.Utils.getSwipeDirection(diff,currentData.swipeDelta,angle);
+				int otherRow = selected.tileModel.row, otherCol = selected.tileModel.col;
+				switch (userDir){
+					case Dir.Up:
+						++otherRow;
+						break;
+					case Dir.Down:
+						--otherRow;
+						break;
+					case Dir.Left:
+						--otherCol;
+						break; 
+					case Dir.Right:
+						++otherCol;
+						break;
+					case Dir.NoDir:
+						return;
+				}
+			
+				if(otherCol < 0 || otherCol >= currentData.numCols|| otherRow < 0   || otherRow >= currentData.numRows)return;
+
+				TileModel other = boardModel.getTileModelAt(otherRow, otherCol);
+				if(other == null || !boardModel.canSwap(selected.tileModel,other))return;
+				Assert.IsNotNull(other.AttachedTileActor);
+				TileActor otherActor = other.AttachedTileActor;
+				//controller updating model,disabling interaction for the view.
+				//model work
+				boardModel.swapTiles(selected.tileModel,other);
+				//view work
+				userInput.enabled = false;
+			
+				StartCoroutine(_tileMovmentAndStabilization(selected,otherActor,currentData.tileMovementTime,onStabilizatonOver));
+			}
+			
+		
+		}
+		
+		
+
+	}
+	
+	
+	
+	
+	public void onInputEnd(){
+	
+		TileActor selected = selectedTile;
+		//clear state at top
+		selectedTile = null;
+		if (selected!=null){
+			selected.restoreHighlight();
+
+
+			Vector2 diff = getpointerPosInBoardSpace() - (Vector2) selected.transform.localPosition;
+			float angle = Mathf.Repeat(Vector2.SignedAngle(myTransform.right,diff)+360.0f,360.0f);
+
+			Dir userDir = Match3.Utils.getSwipeDirection(diff,currentData.swipeDelta,angle);
+			int otherRow = selected.tileModel.row, otherCol = selected.tileModel.col;
+			switch (userDir){
+				case Dir.Up:
+					++otherRow;
+					break;
+				case Dir.Down:
+					--otherRow;
+					break;
+				case Dir.Left:
+					--otherCol;
+					break; 
+				case Dir.Right:
+					++otherCol;
+					break;
+				case Dir.NoDir:
+					return;
+			}
+			
+			if(otherCol < 0 || otherCol >= currentData.numCols|| otherRow < 0   || otherRow >= currentData.numRows)return;
+
+
+
+
+			TileModel other = boardModel.getTileModelAt(otherRow, otherCol);
+			if(other == null || !boardModel.canSwap(selected.tileModel,other))return;
+			
+			Assert.IsNotNull(other.AttachedTileActor);
+			
+			TileActor otherActor = other.AttachedTileActor;
+
+			//controller updating model,disabling interaction for the view.
+
+			//model work
+			boardModel.swapTiles(selected.tileModel,other);
+			//view work
+			userInput.enabled = false;
+			
+			StartCoroutine(_tileMovmentAndStabilization(selected,otherActor,currentData.tileMovementTime,onStabilizatonOver));
+		
+		}
+	}
 	delegate void OncompleteBoardStabilization();
 
 	private IEnumerator _tileMovmentAndStabilization(TileActor first,TileActor second,float moveTime,OncompleteBoardStabilization callback){
@@ -430,62 +537,6 @@ public class GameBoard : MonoBehaviour,UserInputEventHandler{
 	
 	
 	
-	public void onInputEnd(){
-	
-		TileActor selected = selectedTile;
-		//clear state at top
-		selectedTile = null;
-		if (selected!=null){
-			selected.restoreHighlight();
-
-
-			Vector2 diff = getpointerPosInBoardSpace() - (Vector2) selected.transform.localPosition;
-			float angle = Mathf.Repeat(Vector2.SignedAngle(myTransform.right,diff)+360.0f,360.0f);
-
-			
-			
-			Dir userDir = Match3.Utils.getSwipeDirection(diff,currentData.swipeDelta,angle);
-			int otherRow = selected.tileModel.row, otherCol = selected.tileModel.col;
-			switch (userDir){
-				case Dir.Up:
-					++otherRow;
-					break;
-				case Dir.Down:
-					--otherRow;
-					break;
-				case Dir.Left:
-					--otherCol;
-					break; 
-				case Dir.Right:
-					++otherCol;
-					break;
-				case Dir.NoDir:
-					return;
-			}
-			
-			if(otherCol < 0 || otherCol >= currentData.numCols|| otherRow < 0   || otherRow >= currentData.numRows)return;
-
-
-
-
-			TileModel other = boardModel.getTileModelAt(otherRow, otherCol);
-			if(other == null || !boardModel.canSwap(selected.tileModel,other))return;
-			
-			Assert.IsNotNull(other.AttachedTileActor);
-			
-			TileActor otherActor = other.AttachedTileActor;
-
-			//controller updating model,disabling interaction for the view.
-
-			//model work
-			boardModel.swapTiles(selected.tileModel,other);
-			//view work
-			userInput.enabled = false;
-			
-			StartCoroutine(_tileMovmentAndStabilization(selected,otherActor,currentData.tileMovementTime,onStabilizatonOver));
-		
-		}
-	}
 
 	void onStabilizatonOver(){
 		userInput.enabled = true;
